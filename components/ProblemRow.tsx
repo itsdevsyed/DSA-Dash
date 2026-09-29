@@ -2,6 +2,7 @@
 "use client";
 import { memo, useEffect, useRef, useState } from "react";
 import NoteEditor from "./NoteEditor";
+import CodeEditor from "./CodeEditor";
 import { formatComplexity } from "@/lib/complexity";
 import type { MergedProblem, ProblemStatus, UserProgress } from "@/lib/types";
 
@@ -374,13 +375,16 @@ function ProblemRow({
                 placeholder="Edge cases I missed..."
                 rows={2}
               />
-              <NoteEditor
-                label="Code snippet"
-                value={p["Code Snippet"]}
-                onSave={(v) => set({ "Code Snippet": v })}
-                placeholder="Paste your solution..."
-                rows={2}
-              />
+
+              {/* Code Editor spans both columns */}
+              <div className="md:col-span-2">
+                <CodeEditor
+                  value={p["Code Snippet"]}
+                  onSave={(v) => set({ "Code Snippet": v })}
+                  language={p.Language || "javascript"}
+                  onLanguageChange={(lang) => setNow({ Language: lang })}
+                />
+              </div>
             </div>
           </div>
 
