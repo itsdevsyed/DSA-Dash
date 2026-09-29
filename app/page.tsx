@@ -1,69 +1,140 @@
-import Image from "next/image";
+// app/page.tsx
+"use client";
+import { useDeferredValue, useMemo, useState } from "react";
+import { useUser } from "@/hooks/useUser";
+import { useProblems } from "@/hooks/useProblems";
+import StatsBar from "@/components/StatsBar";
+import Filters from "@/components/Filters";
+import ProblemList from "@/components/ProblemList";
+import AuthButton from "@/components/AuthButton";
+import ThemeToggle from "@/components/ThemeToggle";
+import { exportProgress } from "@/lib/storage";
+import type { FiltersState } from "@/lib/types";
 
 export default function Home() {
+  const { user, loading, signOut } = useUser();
+  const { problems, update, reset, hydrated } = useProblems(user?.id);
+
+  const [filters, setFilters] = useState<FiltersState>({
+    search: "",
+    difficulty: "All",
+    status: "All",
+    topic: "All",
+    bookmarkedOnly: false,
+  });
+
+  const deferredSearch = useDeferredValue(filters.search);
+
+  const topics = useMemo(() => {
+    const s = new Set<string>();
+    problems.forEach((p) => (p.Topics || []).forEach((t) => s.add(t)));
+    return [...s].sort();
+  }, [problems]);
+
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim().toLowerCase();
+    return problems.filter((p) => {
+      if (q) {
+        const haystack =
+          `${p["Question Name"]} ${p["Short Notes"]} ${p["Key Insight"]} ${p.Pattern}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if (filters.difficulty !== "All" && p.Difficulty !== filters.difficulty)
+        return false;
+      if (filters.status !== "All" && p.Status !== filters.status)
+        return false;
+      if (filters.topic !== "All" && !(p.Topics || []).includes(filters.topic))
+        return false;
+      if (filters.bookmarkedOnly && !p.Bookmarked) return false;
+      return true;
+    });
+  }, [
+    problems,
+    deferredSearch,
+    filters.difficulty,
+    filters.status,
+    filters.topic,
+    filters.bookmarkedOnly,
+  ]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-[var(--text-tertiary)]">
+        Loading...
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
+    <main className="min-h-screen">
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 space-y-5">
+        {/* Header */}
+        <header className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-[var(--border-subtle)]">
+          <div>
+            <h1 className="text-xl font-semibold">DSA Tracker</h1>
+            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+              {problems.length} problems
+            </p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {user && (
+              <button
+                onClick={exportProgress}
+                className="px-3 py-1.5 rounded-md text-sm bg-[var(--bg-input)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors"
+              >
+                Export
+              </button>
+            )}
+            <AuthButton user={user} signOut={signOut} />
+            <ThemeToggle />
+          </div>
+        </header>
+
+        {!user ? (
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-12 text-center space-y-3">
+            <p className="text-[var(--text-secondary)]">
+              Sign in to sync your progress across devices.
+            </p>
             <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              href="/login"
+              className="inline-block px-4 py-2 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+              Sign in
+            </a>
+          </div>
+        ) : !hydrated ? (
+          <div className="text-[var(--text-tertiary)] text-center py-8">
+            Loading your progress...
+          </div>
+        ) : (
+          <>
+            <StatsBar problems={problems} />
+
+            <div className="sticky top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-[var(--bg-app)]/95 backdrop-blur-sm border-b border-[var(--border-subtle)]">
+              <Filters
+                filters={filters}
+                setFilters={setFilters}
+                topics={topics}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] px-1">
+              <span>
+                {filtered.length} of {problems.length}
+              </span>
+              {deferredSearch !== filters.search && (
+                <span className="text-[var(--accent)]">Searching...</span>
+              )}
+            </div>
+
+            <ProblemList
+              problems={filtered}
+              onUpdate={update}
+              onReset={reset}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          </>
+        )}
+      </div>
+    </main>
   );
 }
