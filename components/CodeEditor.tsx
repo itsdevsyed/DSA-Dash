@@ -51,23 +51,45 @@ export default function CodeEditor({
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [local, setLocal] = useState(value || "");
+  const [focused, setFocused] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
+  // Latest value ref so blur/flush can use it
+  const localRef = useRef(local);
+  localRef.current = local;
+
   useEffect(() => setMounted(true), []);
 
+  // ✅ Only sync from parent when NOT focused (avoid clobbering typing)
   useEffect(() => {
-    setLocal(value || "");
-  }, [value]);
+    if (!focused) {
+      setLocal(value || "");
+    }
+  }, [value, focused]);
 
   const handleChange = (v: string) => {
     setLocal(v);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       onSaveRef.current(v);
+      timer.current = null;
     }, 800);
+  };
+
+  // ✅ Flush on blur so nothing is lost
+  const handleBlur = () => {
+    setFocused(false);
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    // If local differs from prop, save immediately
+    if (localRef.current !== value) {
+      onSaveRef.current(localRef.current);
+    }
   };
 
   const isDark = resolvedTheme === "dark";
@@ -139,6 +161,8 @@ export default function CodeEditor({
             theme={isDark ? oneDark : "light"}
             extensions={getLanguageExtension(language)}
             onChange={handleChange}
+            onFocus={() => setFocused(true)}
+            onBlur={handleBlur}
             basicSetup={{
               lineNumbers: true,
               highlightActiveLineGutter: true,
@@ -164,7 +188,7 @@ export default function CodeEditor({
       </div>
 
       <div className="text-[10px] text-[var(--text-tertiary)] flex justify-between px-0.5">
-        <span>Auto-saves after 800ms</span>
+        <span>Auto-saves after 800ms · or on blur</span>
         <span>{local.split("\n").length} lines</span>
       </div>
     </div>

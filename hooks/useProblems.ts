@@ -61,6 +61,7 @@ export function useProblems(userId?: string): UseProblemsReturn {
 
         clearTimeout(timers.current[id]);
         timers.current[id] = setTimeout(() => {
+          // ✅ Read from the LATEST state via ref
           saveOne(id, next[id]);
         }, debounce);
 
